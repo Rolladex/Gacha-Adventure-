@@ -51,6 +51,20 @@ class Player:
             return
 
         x, y = self.position
+
+        if not direction:  # If no direction is provided
+            valid_directions = []
+
+            for d, wall in self._direction_walls.items():
+                if maze._grid[x][y].walls[wall]:
+                    valid_directions.append(d)
+
+            if not valid_directions:
+                print("No valid directions to mine from the current position.")
+                return
+
+            direction = random.choice(valid_directions)
+
         wall = self._direction_walls.get(direction)
 
         if wall and maze._grid[x][y].walls[wall]:
@@ -59,18 +73,18 @@ class Player:
             self.mining_tool_durability -= 1
             print(f"Mined the {direction} wall and earned {coins_earned} coins!")
         else:
-            print(f"Cannot mine {direction} from current position.")
+            print(f"Cannot mine {direction} from the current position.")
 
     def get_stat(self, stat):
         return self.statistics[stat]
 
-    def add_gatcha(self, gatcha_item):
+    def add_gatcha(self, gatcha_item):  # ???
         if gatcha_item.is_good:
             self.good_gatcha.append(gatcha_item)
         else:
             self.bad_gatcha.append(gatcha_item)
 
-    def last_gatcha(self, good):
+    def last_gatcha(self, good):  # ???
         if good:
             return self.good_gatcha[-1]
         else:
@@ -94,7 +108,7 @@ RARITY_COUNT = 8
 class GatchaFactory:
 
     def __init__(self):
-        # we create Gatcha here.
+        # we create Gacha here.
         self.rarity_prefix = [        # Poe?
             "bad", "okay",            # 0, 1 - name
             "good", "great",          # 2, 3 - prefix + name
@@ -144,7 +158,7 @@ class GatchaFactory:
         pass
 
 
-class DeckCards:
+class DeckCards:  # TODO: Add card games.
     SUITS = ['Hearts', 'Diamonds', 'Clubs', 'Spades']
     VALUES = ['2', '3', '4', '5',
               '6', '7', '8', '9', '10',
@@ -229,9 +243,21 @@ class Game:
             "mine": self.player.mine
         }
 
+        # Shorthand for directions
+        self.direction_shorthand = {
+            "w": "up",
+            "s": "down",
+            "a": "left",
+            "d": "right",
+            "m": "mine"
+        }
+
     def play(self):
         print("Welcome to the game!")
         print("Commands: go [direction], mine [direction], quit")
+        action = input("Enter your action: ")
+        sanitized_action = self.sanitize_input(action)
+        self.parse_action(sanitized_action)
         while True:
             self.display()
             action = input("Enter your action: ").lower()
@@ -264,42 +290,90 @@ class Game:
                     print("  ", end="")
             print()
 
+    def sanitize_input(self, action):
+        # Strip leading and trailing whitespaces
+        sanitized_action = action.strip()
+
+        # Convert to lowercase for consistency
+        sanitized_action = sanitized_action.lower()
+
+        # Remove any characters not allowed (for this example, we'll just allow alphanumeric characters and spaces)
+        sanitized_action = ''.join(char for char in sanitized_action if char.isalnum() or char.isspace())
+
+        return sanitized_action
+
     def parse_action(self, action):
+        sanitized_action = self.sanitize_input(action)
+
+        split_action = sanitized_action.split()
+        # Filter out empty strings from the split result
+        valid_parts = [part for part in split_action if part]
+
+        # If there are no valid parts, return with a message
+        if not valid_parts:
+            print("No valid action entered. Please enter a valid command.")
+            return
+
+        command, *args = valid_parts
+
+        # Mapping shorthand commands to their full versions
+        shorthand_commands = {
+            'w': 'up',
+            's': 'down',
+            'a': 'left',
+            'd': 'right',
+            'm': 'mine'
+        }
+
         # Split the user action into command and arguments
-        command, *args = action.split()
+        command, *args = sanitized_action.split()
+
+        # Check if the command is a shorthand and replace it
+        if command in shorthand_commands:
+            if command == 'm':  # If the command is 'mine'
+                command = shorthand_commands[command]
+            else:  # If the command is a movement direction
+                args = [shorthand_commands[command]]
+                command = 'go'  # Prepend the 'go' command
+        else:
+            command = shorthand_commands.get(command, command)
 
         # Check if the command is in our action handlers
         if command in self.action_handlers:
-            # Check for valid arguments for the given command
-            if command == "go" or command == "walk":
-                directions = ["left", "right", "up", "down"]
-                if args[0] in directions:
-                    self.action_handlers[command](args[0])
+            # Provide feedback and execute the action
+            print(f"Executing {command} command...")
+            if command == "mine":
+                if len(args) == 0:  # No direction provided
+                    self.action_handlers[command](None, self.maze)  # pass None as direction and maze instance
                 else:
-                    print(f"Unknown direction '{args[0]}'. Valid directions are: {', '.join(directions)}")
-            elif command == "mine":
-                self.action_handlers[command](args[0], self.maze)
-            # Handle other commands as needed
+                    self.action_handlers[command](*args, self.maze)  # pass the direction and maze instance
+            else:
+                self.action_handlers[command](*args)
         else:
             # Dynamic feedback for unrecognized commands
             similar_commands = [cmd for cmd in self.action_handlers if cmd.startswith(command)]
             if similar_commands:
                 print(f"Did you mean {', '.join(similar_commands)}?")
             else:
-                print("Invalid action. Try commands like 'go left', 'mine up', etc.")
+                print("Invalid action. Try commands like 'go left', 'mine', etc.")
 
     def move(self, direction):
         x, y = self.player.position
-        if direction == "left" and not self.maze._grid[x][y].walls["left"]:
+        wall_direction = self.player._direction_walls[direction]
+
+        if direction == "left" and not self.maze._grid[x][y].walls[wall_direction]:
             self.player.position = (x-1, y)
-        elif direction == "right" and not self.maze._grid[x][y].walls["right"]:
+        elif direction == "right" and not self.maze._grid[x][y].walls[wall_direction]:
             self.player.position = (x+1, y)
-        elif direction == "up" and not self.maze._grid[x][y].walls["top"]:
+        elif direction == "up" and not self.maze._grid[x][y].walls[wall_direction]:
             self.player.position = (x, y-1)
-        elif direction == "down" and not self.maze._grid[x][y].walls["bottom"]:
+        elif direction == "down" and not self.maze._grid[x][y].walls[wall_direction]:
             self.player.position = (x, y+1)
         else:
-            print(f"Cannot move {direction} from current position.")
+            print(f"🚧 Cannot move {direction} from position {self.player.position}. There's a wall!")
+            return  # Return early if the player can't move in the specified direction
+
+        print(f"🚶 Moved {direction} to position {self.player.position}")
         x, y = self.player.position
         self.current_location = f"({x}, {y}) in the maze"
 
