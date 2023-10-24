@@ -27,7 +27,7 @@ Dive into the mysterious maze and embark on a thrilling quest to find treasures,
 
 2. **Navigate to the Directory** 🗂️:
    ```bash
-   cd maze-adventure-game
+   cd gacha-game-
    ```
 
 3. **Run the Game** 🚀:
